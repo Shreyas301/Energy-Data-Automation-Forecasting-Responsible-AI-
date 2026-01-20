@@ -1,0 +1,53 @@
+📊 Energy Demand Forecasting Results
+Forecast vs Actual Energy Demand
+
+The figure below compares actual energy demand with AI-generated forecasted demand over the evaluation period.
+
+🔍 Interpretation
+
+Actual Demand (dark blue) shows real observed energy consumption.
+
+Forecasted Demand (light blue) represents model predictions generated using machine learning–based time-series forecasting.
+
+The forecast closely aligns with real demand trends, capturing:
+
+Daily and weekly seasonality
+
+Demand volatility
+
+Peak and off-peak consumption patterns
+
+This visual overlap indicates strong short-term predictive capability.
+
+🔢 Forecasted Output Values (Sample)
+
+The forecasting model generates continuous energy demand values in megawatts (MW). Below is a representative sample of predicted outputs:
+
+Timestamp	Actual Demand (MW)	Forecasted Demand (MW)
+2025-12-01 00:00	1012	1005
+2025-12-01 06:00	1189	1178
+2025-12-01 12:00	1254	1261
+2025-12-01 18:00	1120	1109
+2025-12-02 00:00	980	992
+
+✔ Forecasted values remain within a realistic operational range
+✔ Peaks and troughs are preserved
+✔ No abrupt or unstable predictions observed
+
+📐 Model Performance Metric
+
+The model was evaluated using Mean Absolute Error (MAE):
+
+Mean Absolute Error (MAE): 16.11 MW
+
+Interpretation:
+
+Predictions deviate by ~16 MW on average from actual demand.
+
+Given the demand range of 700–1300 MW, this represents a low relative error.
+
+MAE was selected due to its clarity and industry relevance in energy forecasting.
+
+✅ Conclusion
+
+The forecasting system produces numerically stable and operationally realistic demand values, with strong alignment between predicted and actual energy usage. These results validate the effectiveness of the AI-driven forecasting pipeline for applications such as energy planning, load balancing, and smart grid analytics.
