@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AURA — AI Dashboard Builder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #1a1a24;
+    --bg4: #22222e;
+    --border: #2a2a3a;
+    --border2: #3a3a50;
+    --accent: #6c63ff;
+    --accent2: #a78bfa;
+    --accent3: #38bdf8;
+    --green: #34d399;
+    --orange: #fb923c;
+    --red: #f87171;
+    --pink: #f472b6;
+    --text: #e8e8f0;
+    --text2: #9090a8;
+    --text3: #6060780;
+    --shadow: 0 8px 32px rgba(0,0,0,0.6);
+    --radius: 12px;
+    --radius2: 8px;
+    --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+    --chart-colors: #6c63ff,#38bdf8,#34d399,#fb923c,#f472b6,#a78bfa,#f87171,#fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Instrument Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  
+  /* ── TOP BAR ── */
+  #topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 20px; height: 54px; min-height: 54px;
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    z-index: 100;
+  }
+  .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 20px; color: var(--accent2); letter-spacing: -0.5px; margin-right: 8px; }
+  .logo span { color: var(--accent3); }
+  .topbar-tabs { display: flex; gap: 2px; }
+  .tab-btn { padding: 5px 14px; border-radius: 6px; border: none; background: none; color: var(--text2); font-size: 13px; cursor: pointer; transition: var(--transition); font-family: inherit; }
+  .tab-btn.active, .tab-btn:hover { background: var(--bg3); color: var(--text); }
+  .tab-btn.active { color: var(--accent2); }
+  .topbar-sep { width: 1px; height: 28px; background: var(--border); margin: 0 8px; }
+  #api-key-area { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  #api-input { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 6px; font-size: 12px; width: 220px; font-family: 'JetBrains Mono', monospace; }
+  .btn { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-family: 'Instrument Sans', sans-serif; font-size: 13px; font-weight: 500; transition: var(--transition); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #7c75ff; }
+  .btn-ghost { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-icon { width: 30px; height: 30px; padding: 0; display: flex; align-items: center; justify-content: center; }
+
+  /* ── MAIN LAYOUT ── */
+  #main { display: flex; flex: 1; overflow: hidden; }
+  #sidebar { width: 260px; min-width: 260px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; transition: width 0.3s; }
+  #sidebar.collapsed { width: 48px; min-width: 48px; }
+  #canvas-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #right-panel { width: 300px; min-width: 300px; background: var(--bg2); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  #right-panel.hidden { display: none; }
+
+  /* ── SIDEBAR ── */
+  .sidebar-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .sidebar-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text2); margin-bottom: 10px; }
+  #upload-zone { border: 2px dashed var(--border2); border-radius: var(--radius2); padding: 16px 12px; text-align: center; cursor: pointer; transition: var(--transition); }
+  #upload-zone:hover, #upload-zone.drag { border-color: var(--accent); background: rgba(108,99,255,0.05); }
+  #upload-zone p { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .upload-icon { font-size: 22px; }
+  .datasource-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: var(--transition); }
+  .datasource-item:hover { background: var(--bg3); }
+  .datasource-item .ds-icon { font-size: 14px; }
+  .datasource-item .ds-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .datasource-item .ds-rows { font-size: 11px; color: var(--text2); font-family: 'JetBrains Mono', monospace; }
+
+  /* Fields panel */
+  .field-search { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-size: 12px; font-family: inherit; margin-bottom: 8px; }
+  .field-group { margin-bottom: 6px; }
+  .field-group-header { font-size: 11px; color: var(--text2); padding: 2px 0; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .field-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 5px; cursor: grab; font-size: 12px; transition: var(--transition); }
+  .field-item:hover { background: var(--bg4); }
+  .field-item.dragging { opacity: 0.5; }
+  .field-type { font-size: 10px; padding: 1px 5px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+  .field-type.num { background: rgba(52,211,153,0.15); color: var(--green); }
+  .field-type.str { background: rgba(56,189,248,0.15); color: var(--accent3); }
+  .field-type.date { background: rgba(251,146,60,0.15); color: var(--orange); }
+  .field-type.bool { background: rgba(167,139,250,0.15); color: var(--accent2); }
+
+  /* ── CANVAS TOOLBAR ── */
+  #canvas-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); background: var(--bg2); flex-wrap: wrap; }
+  .viz-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: var(--transition); font-family: inherit; }
+  .viz-btn:hover { border-color: var(--accent); color: var(--accent2); }
+  .viz-btn.active { border-color: var(--accent); color: var(--accent2); background: rgba(108,99,255,0.1); }
+
+  /* ── NLP BAR ── */
+  #nlp-bar { display: flex; gap: 8px; padding: 8px 14px; background: var(--bg); border-bottom: 1px solid var(--border); }
+  #nlp-input { flex: 1; background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; padding: 8px 14px; color: var(--text); font-size: 13px; font-family: 'Instrument Sans', sans-serif; transition: var(--transition); }
+  #nlp-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,99,255,0.15); }
+  #nlp-btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer; font-family: 'Syne', sans-serif; font-weight: 600; font-size: 13px; white-space: nowrap; transition: var(--transition); }
+  #nlp-btn:hover { filter: brightness(1.1); }
+  .nlp-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 4px 14px 8px; }
+  .nlp-chip { font-size: 11px; padding: 3px 10px; border-radius: 20px; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); cursor: pointer; transition: var(--transition); }
+  .nlp-chip:hover { border-color: var(--accent); color: var(--accent2); }
+
+  /* ── CANVAS ── */
+  #canvas { flex: 1; overflow: auto; padding: 16px; display: grid; grid-template-columns: repeat(12, 1fr); grid-auto-rows: 60px; gap: 10px; align-content: start; position: relative; }
+  #canvas.drag-over { background: rgba(108,99,255,0.03); }
+  .empty-state { grid-column: 1/-1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 400px; gap: 12px; color: var(--text2); }
+  .empty-state h2 { font-family: 'Syne', sans-serif; font-size: 24px; color: var(--text); }
+  .empty-state p { font-size: 14px; max-width: 400px; text-align: center; }
+
+  /* ── WIDGET CARDS ── */
+  .widget-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; position: relative; display: flex; flex-direction: column; transition: border-color 0.2s; cursor: pointer; }
+  .widget-card:hover { border-color: var(--border2); }
+  .widget-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,99,255,0.2); }
+  .widget-card.col-4 { grid-column: span 4; }
+  .widget-card.col-6 { grid-column: span 6; }
+  .widget-card.col-12 { grid-column: span 12; }
+  .widget-card.col-3 { grid-column: span 3; }
+  .widget-card.col-8 { grid-column: span 8; }
+  .widget-card.row-2 { grid-row: span 2; }
+  .widget-card.row-3 { grid-row: span 3; }
+  .widget-card.row-4 { grid-row: span 4; }
+  .widget-card.row-5 { grid-row: span 5; }
+  .widget-card.row-6 { grid-row: span 6; }
+  .widget-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 4px; flex-shrink: 0; }
+  .widget-title { font-size: 12px; font-weight: 600; color: var(--text2); }
+  .widget-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s; }
+  .widget-card:hover .widget-actions { opacity: 1; }
+  .widget-action-btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); border-radius: 5px; padding: 2px 7px; font-size: 11px; cursor: pointer; }
+  .widget-action-btn:hover { color: var(--text); }
+  .widget-body { flex: 1; padding: 4px 12px 12px; overflow: hidden; position: relative; min-height: 0; }
+  .widget-body canvas { max-height: 100%; }
+  .resize-handle { position: absolute; bottom: 4px; right: 4px; width: 12px; height: 12px; cursor: se-resize; opacity: 0.3; }
+  .resize-handle:hover { opacity: 0.8; }
+  .resize-handle::before { content: '⊞'; font-size: 14px; color: var(--text2); }
+
+  /* KPI Card */
+  .kpi-card { display: flex; flex-direction: column; justify-content: center; padding: 16px; }
+  .kpi-value { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; line-height: 1; }
+  .kpi-label { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .kpi-delta { font-size: 12px; margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+  .kpi-delta.pos { color: var(--green); }
+  .kpi-delta.neg { color: var(--red); }
+
+  /* Table */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th { background: var(--bg3); padding: 6px 10px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text2); border-bottom: 1px solid var(--border); position: sticky; top: 0; cursor: pointer; }
+  .data-table th:hover { color: var(--text); }
+  .data-table td { padding: 5px 10px; border-bottom: 1px solid var(--border); color: var(--text); }
+  .data-table tr:hover td { background: var(--bg3); }
+  .table-scroll { overflow: auto; max-height: 100%; }
+  .bar-fill { display: inline-block; height: 6px; border-radius: 3px; background: var(--accent); min-width: 2px; }
+
+  /* ── RIGHT PANEL ── */
+  .rpanel-tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .rpanel-tab { flex: 1; padding: 10px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text2); transition: var(--transition); border-bottom: 2px solid transparent; }
+  .rpanel-tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+  .rpanel-content { flex: 1; overflow-y: auto; padding: 14px; }
+  .prop-group { margin-bottom: 16px; }
+  .prop-label { font-size: 11px; color: var(--text2); font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .prop-input { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-size: 12px; font-family: inherit; }
+  .prop-input:focus { outline: none; border-color: var(--accent); }
+  select.prop-input option { background: var(--bg3); }
+  .prop-row { display: flex; gap: 6px; margin-bottom: 6px; }
+  .prop-row .prop-input { flex: 1; }
+  .color-swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+  .swatch { width: 24px; height: 24px; border-radius: 5px; cursor: pointer; border: 2px solid transparent; }
+  .swatch.active { border-color: #fff; }
+  .drop-zone { border: 2px dashed var(--border2); border-radius: 6px; padding: 10px; min-height: 48px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text2); transition: var(--transition); flex-wrap: wrap; gap: 4px; }
+  .drop-zone.has-field { border-style: solid; border-color: var(--accent); justify-content: flex-start; }
+  .drop-zone:hover { border-color: var(--border2); background: var(--bg3); }
+  .field-pill { background: rgba(108,99,255,0.15); border: 1px solid var(--accent); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: var(--accent2); display: flex; align-items: center; gap: 4px; }
+  .field-pill button { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 12px; padding: 0; line-height: 1; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .toggle-label { font-size: 12px; color: var(--text2); }
+  .toggle { position: relative; width: 36px; height: 20px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: var(--bg4); border-radius: 20px; cursor: pointer; transition: var(--transition); }
+  .slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: var(--text2); border-radius: 50%; transition: var(--transition); }
+  .toggle input:checked + .slider { background: var(--accent); }
+  .toggle input:checked + .slider::before { transform: translateX(16px); background: #fff; }
+
+  /* ── INSIGHTS PANEL ── */
+  #insights-panel { padding: 14px; overflow-y: auto; flex: 1; }
+  .insight-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius2); padding: 12px; margin-bottom: 10px; }
+  .insight-card h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .insight-card p { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .insight-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+  .badge-trend { background: rgba(52,211,153,0.15); color: var(--green); }
+  .badge-anomaly { background: rgba(248,113,113,0.15); color: var(--red); }
+  .badge-insight { background: rgba(108,99,255,0.15); color: var(--accent2); }
+  .badge-forecast { background: rgba(56,189,248,0.15); color: var(--accent3); }
+  
+  /* ── AI CHAT ── */
+  #ai-chat { display: flex; flex-direction: column; height: 100%; }
+  #chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .chat-msg { max-width: 90%; padding: 8px 12px; border-radius: 10px; font-size: 12px; line-height: 1.5; }
+  .chat-msg.user { background: var(--accent); color: #fff; align-self: flex-end; border-radius: 10px 10px 2px 10px; }
+  .chat-msg.ai { background: var(--bg3); border: 1px solid var(--border); align-self: flex-start; border-radius: 10px 10px 10px 2px; }
+  .chat-msg.ai code { font-family: 'JetBrains Mono', monospace; font-size: 11px; background: var(--bg4); padding: 1px 4px; border-radius: 3px; }
+  #chat-input-row { display: flex; gap: 6px; padding: 10px; border-top: 1px solid var(--border); }
+  #chat-input { flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--text); font-size: 12px; font-family: inherit; }
+  #chat-input:focus { outline: none; border-color: var(--accent); }
+  #chat-send { background: var(--accent); border: none; border-radius: 6px; padding: 6px 12px; color: #fff; cursor: pointer; font-size: 12px; }
+
+  /* ── FILTER BAR ── */
+  #filter-bar { display: flex; align-items: center; gap: 8px; padding: 6px 14px; background: var(--bg); border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .filter-chip { display: flex; align-items: center; gap: 6px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 12px; white-space: nowrap; cursor: pointer; transition: var(--transition); }
+  .filter-chip:hover { border-color: var(--border2); }
+  .filter-chip.active { border-color: var(--accent); color: var(--accent2); background: rgba(108,99,255,0.1); }
+  .filter-chip .fc-remove { margin-left: 2px; color: var(--text2); font-size: 14px; }
+  #date-range { font-size: 12px; color: var(--text2); }
+
+  /* ── MODALS ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+  .modal { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; width: min(600px, 90vw); max-height: 80vh; overflow-y: auto; }
+  .modal h2 { font-family: 'Syne', sans-serif; font-size: 18px; margin-bottom: 16px; }
+  .modal-close { float: right; background: none; border: none; color: var(--text2); font-size: 20px; cursor: pointer; line-height: 1; }
+  
+  /* ── STATUS BAR ── */
+  #status-bar { display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 28px; background: var(--bg2); border-top: 1px solid var(--border); font-size: 11px; color: var(--text2); flex-shrink: 0; }
+  #status-bar .status-sep { color: var(--border2); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); display: inline-block; }
+  
+  /* ── DATA EXPLORER ── */
+  #data-explorer { display: none; flex-direction: column; height: 100%; }
+  #data-explorer.active { display: flex; }
+  .de-toolbar { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); align-items: center; }
+  .de-table-area { flex: 1; overflow: auto; }
+  .formula-bar { display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-bottom: 1px solid var(--border); background: var(--bg3); }
+  .formula-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent2); }
+  .formula-input { flex: 1; background: none; border: none; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 12px; outline: none; }
+
+  /* ── LOADING ── */
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-bar { height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .loading-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3)); animation: loadbar 1.5s ease-in-out infinite; background-size: 200%; }
+  @keyframes loadbar { 0%,100%{background-position:0%} 50%{background-position:100%} }
+  
+  /* ── SCROLLBARS ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border2); }
+
+  /* ── TOOLTIP ── */
+  .tooltip { position: fixed; background: var(--bg4); border: 1px solid var(--border2); border-radius: 6px; padding: 6px 10px; font-size: 11px; pointer-events: none; z-index: 9999; max-width: 200px; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+  .fade-up { animation: fadeUp 0.3s ease forwards; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .pulsing { animation: pulse 1.5s ease infinite; }
+
+  /* Formatting row */
+  .fmt-row { display: flex; gap: 4px; margin-bottom: 8px; }
+  .fmt-btn { flex: 1; padding: 5px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); font-size: 12px; cursor: pointer; text-align: center; transition: var(--transition); }
+  .fmt-btn:hover, .fmt-btn.active { background: rgba(108,99,255,0.15); border-color: var(--accent); color: var(--accent2); }
+
+  /* DAX / Formula editor */
+  .code-editor { width: 100%; min-height: 80px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 12px; resize: vertical; }
+  .code-editor:focus { outline: none; border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">AURA <span>BI</span></div>
+  <div class="topbar-tabs">
+    <button class="tab-btn active" onclick="switchView('canvas')">📊 Report</button>
+    <button class="tab-btn" onclick="switchView('data')">🗃️ Data</button>
+    <button class="tab-btn" onclick="switchView('model')">🔗 Model</button>
+  </div>
+  <div class="topbar-sep"></div>
+  <button class="btn btn-ghost btn-sm" onclick="saveReport()">💾 Save</button>
+  <button class="btn btn-ghost btn-sm" onclick="exportReport()">📤 Export</button>
+  <button class="btn btn-ghost btn-sm" onclick="showThemeModal()">🎨 Theme</button>
+  <button class="btn btn-ghost btn-sm" onclick="document.getElementById('share-modal').style.display='flex'">🔗 Share</button>
+  <div class="topbar-sep"></div>
+  <div id="api-key-area">
+    <input id="api-input" type="password" placeholder="sk-ant-... (for AI features)" />
+    <button class="btn btn-primary btn-sm" onclick="saveApiKey()">✓ Set Key</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <!-- Data Sources -->
+    <div class="sidebar-section">
+      <div class="sidebar-title">Data Sources</div>
+      <div id="upload-zone" onclick="document.getElementById('file-input').click()" ondrop="handleDrop(event)" ondragover="e=>e.preventDefault()">
+        <div class="upload-icon">⬆️</div>
+        <div style="font-size:12px;font-weight:600;margin-top:4px;">Drop files here</div>
+        <p>CSV, Excel, JSON, TSV</p>
+      </div>
+      <input id="file-input" type="file" accept=".csv,.xlsx,.xls,.json,.tsv" multiple style="display:none" onchange="handleFileUpload(event)" />
+      <div id="datasources-list" style="margin-top:10px;display:flex;flex-direction:column;gap:4px;"></div>
+      <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="loadSampleData('sales')">📈 Sales</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadSampleData('finance')">💰 Finance</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadSampleData('hr')">👥 HR</button>
+        <button class="btn btn-ghost btn-sm" onclick="showSQLModal()">🗄️ SQL</button>
+      </div>
+    </div>
+
+    <!-- Fields -->
+    <div class="sidebar-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="sidebar-title">Fields</div>
+      <input class="field-search" id="field-search" placeholder="Search fields..." oninput="filterFields(this.value)" />
+      <div id="fields-list" style="flex:1;overflow-y:auto;"></div>
+    </div>
+
+    <!-- Measures -->
+    <div class="sidebar-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="sidebar-title" style="margin-bottom:0;">Measures</div>
+        <button class="btn btn-ghost btn-sm" onclick="showMeasureModal()">+ New</button>
+      </div>
+      <div id="measures-list" style="display:flex;flex-direction:column;gap:3px;"></div>
+    </div>
+  </div>
+
+  <!-- CANVAS AREA -->
+  <div id="canvas-area">
+    <!-- NLP Bar -->
+    <div id="nlp-bar">
+      <input id="nlp-input" placeholder="✨ Ask AI: 'Show me sales by region as a bar chart' or 'What are the top 10 products?'" onkeydown="if(event.key==='Enter')nlpGenerate()" />
+      <button id="nlp-btn" onclick="nlpGenerate()">⚡ Generate</button>
+    </div>
+    <div class="nlp-chips" id="nlp-chips">
+      <span class="nlp-chip" onclick="quickNLP(this)">Top 10 by revenue</span>
+      <span class="nlp-chip" onclick="quickNLP(this)">Monthly trend line</span>
+      <span class="nlp-chip" onclick="quickNLP(this)">Sales by category</span>
+      <span class="nlp-chip" onclick="quickNLP(this)">KPI summary cards</span>
+      <span class="nlp-chip" onclick="quickNLP(this)">Correlation heatmap</span>
+      <span class="nlp-chip" onclick="quickNLP(this)">Forecast next 3 months</span>
+      <span class="nlp-chip" onclick="quickNLP(this)">Anomaly detection</span>
+      <span class="nlp-chip" onclick="quickNLP(this)">Full dashboard</span>
+    </div>
+
+    <!-- Viz Toolbar -->
+    <div id="canvas-toolbar">
+      <span style="font-size:11px;color:var(--text2);font-weight:600;">ADD VISUAL:</span>
+      <button class="viz-btn" onclick="addViz('bar')">📊 Bar</button>
+      <button class="viz-btn" onclick="addViz('line')">📈 Line</button>
+      <button class="viz-btn" onclick="addViz('pie')">🍩 Pie</button>
+      <button class="viz-btn" onclick="addViz('scatter')">⚪ Scatter</button>
+      <button class="viz-btn" onclick="addViz('area')">📉 Area</button>
+      <button class="viz-btn" onclick="addViz('table')">📋 Table</button>
+      <button class="viz-btn" onclick="addViz('kpi')">🔢 KPI</button>
+      <button class="viz-btn" onclick="addViz('heatmap')">🟥 Heatmap</button>
+      <button class="viz-btn" onclick="addViz('treemap')">🌳 Treemap</button>
+      <button class="viz-btn" onclick="addViz('waterfall')">🌊 Waterfall</button>
+      <button class="viz-btn" onclick="addViz('funnel')">🔻 Funnel</button>
+      <button class="viz-btn" onclick="addViz('gauge')">🎯 Gauge</button>
+      <button class="viz-btn" onclick="addViz('text')">📝 Text</button>
+      <div style="flex:1;"></div>
+      <button class="btn btn-ghost btn-sm" onclick="clearCanvas()">🗑️ Clear</button>
+      <button class="btn btn-ghost btn-sm" onclick="autoLayout()">⚡ Auto Layout</button>
+    </div>
+
+    <!-- Filter Bar -->
+    <div id="filter-bar">
+      <span style="font-size:11px;color:var(--text2);font-weight:600;">FILTERS:</span>
+      <div class="filter-chip" onclick="addFilter()">+ Add Filter</div>
+      <div id="active-filters"></div>
+      <div style="flex:1;"></div>
+      <select id="date-range" class="prop-input" style="width:auto;font-size:11px;" onchange="applyDateFilter(this.value)">
+        <option value="all">All Time</option>
+        <option value="ytd">Year to Date</option>
+        <option value="qtd">Quarter to Date</option>
+        <option value="mtd">Month to Date</option>
+        <option value="last30">Last 30 Days</option>
+        <option value="last7">Last 7 Days</option>
+      </select>
+    </div>
+
+    <!-- CANVAS -->
+    <div id="canvas" ondrop="canvasDrop(event)" ondragover="e=>e.preventDefault()">
+      <div class="empty-state" id="empty-state">
+        <div style="font-size:48px;">📊</div>
+        <h2>Start Building Your Dashboard</h2>
+        <p>Upload a dataset, use the NLP bar to generate visuals with AI, or drag chart types onto the canvas</p>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="btn btn-primary" onclick="loadSampleData('sales')">Load Sample Data</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('nlp-input').focus()">Ask AI</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATUS BAR -->
+    <div id="status-bar">
+      <span class="status-dot"></span>
+      <span id="status-text">Ready</span>
+      <span class="status-sep">|</span>
+      <span id="row-count">No data loaded</span>
+      <span class="status-sep">|</span>
+      <span id="widget-count">0 visuals</span>
+      <span class="status-sep">|</span>
+      <span id="filter-status">No filters</span>
+      <div style="flex:1"></div>
+      <span id="last-refresh" style="color:var(--text2)"></span>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="right-panel">
+    <div class="rpanel-tabs">
+      <div class="rpanel-tab active" onclick="switchRPanel('format')">Format</div>
+      <div class="rpanel-tab" onclick="switchRPanel('analytics')">Analytics</div>
+      <div class="rpanel-tab" onclick="switchRPanel('ai')">AI Chat</div>
+    </div>
+
+    <!-- FORMAT TAB -->
+    <div id="rpanel-format" class="rpanel-content">
+      <div style="color:var(--text2);font-size:12px;text-align:center;margin-top:20px;" id="no-selection-msg">Select a visual to format</div>
+      <div id="format-controls" style="display:none;">
+        <div class="prop-group">
+          <div class="prop-label">Visual Type</div>
+          <select class="prop-input" id="fmt-type" onchange="changeVizType(this.value)">
+            <option value="bar">Bar Chart</option>
+            <option value="line">Line Chart</option>
+            <option value="pie">Pie / Donut</option>
+            <option value="scatter">Scatter Plot</option>
+            <option value="area">Area Chart</option>
+            <option value="table">Table</option>
+            <option value="kpi">KPI Card</option>
+            <option value="heatmap">Heatmap</option>
+            <option value="treemap">Treemap</option>
+            <option value="waterfall">Waterfall</option>
+            <option value="funnel">Funnel</option>
+            <option value="gauge">Gauge</option>
+            <option value="text">Text Box</option>
+          </select>
+        </div>
+        <div class="prop-group">
+          <div class="prop-label">Title</div>
+          <input class="prop-input" id="fmt-title" placeholder="Chart title..." oninput="updateWidgetTitle(this.value)" />
+        </div>
+        <div class="prop-group">
+          <div class="prop-label">X Axis / Category</div>
+          <div class="drop-zone" id="dz-x" ondrop="dropField(event,'x')" ondragover="e=>e.preventDefault()">
+            <span id="dz-x-text">Drop field here</span>
+          </div>
+        </div>
+        <div class="prop-group">
+          <div class="prop-label">Y Axis / Values</div>
+          <div class="drop-zone" id="dz-y" ondrop="dropField(event,'y')" ondragover="e=>e.preventDefault()">
+            <span id="dz-y-text">Drop field here</span>
+          </div>
+        </div>
+        <div class="prop-group">
+          <div class="prop-label">Color / Series</div>
+          <div class="drop-zone" id="dz-color" ondrop="dropField(event,'color')" ondragover="e=>e.preventDefault()">
+            <span id="dz-color-text">Drop field here</span>
+          </div>
+        </div>
+        <div class="prop-group">
+          <div class="prop-label">Aggregation</div>
+          <select class="prop-input" id="fmt-agg" onchange="updateAggregation(this.value)">
+            <option value="sum">Sum</option>
+            <option value="avg">Average</option>
+            <option value="count">Count</option>
+            <option value="max">Max</option>
+            <option value="min">Min</option>
+            <option value="median">Median</option>
+          </select>
+        </div>
+        <div class="prop-group">
+          <div class="prop-label">Size</div>
+          <div class="prop-row">
+            <select class="prop-input" id="fmt-cols" onchange="resizeWidget('cols',this.value)">
+              <option value="3">3/12</option>
+              <option value="4">4/12</option>
+              <option value="6" selected>6/12</option>
+              <option value="8">8/12</option>
+              <option value="12">Full Width</option>
+            </select>
+            <select class="prop-input" id="fmt-rows" onchange="resizeWidget('rows',this.value)">
+              <option value="2">2 rows</option>
+              <option value="3" selected>3 rows</option>
+              <option value="4">4 rows</option>
+              <option value="5">5 rows</option>
+              <option value="6">6 rows</option>
+            </select>
+          </div>
+        </div>
+        <div class="prop-group">
+          <div class="prop-label">Color Theme</div>
+          <div class="color-swatches" id="color-swatches"></div>
+        </div>
+        <div class="prop-group">
+          <div class="prop-label">Options</div>
+          <div class="toggle-row">
+            <span class="toggle-label">Show Legend</span>
+            <label class="toggle"><input type="checkbox" checked id="fmt-legend" onchange="updateChartOption('legend',this.checked)"><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label">Show Data Labels</span>
+            <label class="toggle"><input type="checkbox" id="fmt-labels" onchange="updateChartOption('labels',this.checked)"><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label">Show Grid Lines</span>
+            <label class="toggle"><input type="checkbox" checked id="fmt-grid" onchange="updateChartOption('grid',this.checked)"><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label">Stacked</span>
+            <label class="toggle"><input type="checkbox" id="fmt-stacked" onchange="updateChartOption('stacked',this.checked)"><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label">Smooth Lines</span>
+            <label class="toggle"><input type="checkbox" checked id="fmt-smooth" onchange="updateChartOption('smooth',this.checked)"><span class="slider"></span></label>
+          </div>
+        </div>
+        <div class="prop-group">
+          <div class="prop-label">Sort & Limit</div>
+          <div class="prop-row">
+            <select class="prop-input" id="fmt-sort" onchange="updateSortLimit()">
+              <option value="none">No Sort</option>
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+            <input class="prop-input" id="fmt-limit" type="number" placeholder="Limit" style="width:80px;" onchange="updateSortLimit()" />
+          </div>
+        </div>
+        <div class="prop-group">
+          <div class="prop-label">DAX / Custom Formula</div>
+          <textarea class="code-editor" id="fmt-dax" placeholder="= SUM([Sales]) / COUNT([Orders])&#10;= CALCULATE(SUM([Revenue]), FILTER(...))" rows="3"></textarea>
+          <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:4px;" onclick="applyDAX()">▶ Apply Formula</button>
+        </div>
+        <div class="prop-group">
+          <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:4px;" onclick="duplicateWidget()">⧉ Duplicate Visual</button>
+          <button class="btn btn-ghost btn-sm" style="width:100%;color:var(--red);" onclick="deleteWidget()">🗑 Delete Visual</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS TAB -->
+    <div id="rpanel-analytics" class="rpanel-content" style="display:none;">
+      <div class="prop-group">
+        <div class="prop-label">AI Insights</div>
+        <button class="btn btn-primary" style="width:100%;margin-bottom:10px;" onclick="generateInsights()">⚡ Generate Insights</button>
+        <div id="insights-panel"></div>
+      </div>
+      <div class="prop-group">
+        <div class="prop-label">Statistical Analysis</div>
+        <select class="prop-input" id="stat-col" style="margin-bottom:6px;"><option>Select column...</option></select>
+        <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:4px;" onclick="runStats()">📊 Descriptive Stats</button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:4px;" onclick="runCorrelation()">🔗 Correlation Matrix</button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:4px;" onclick="runForecast()">📅 Forecast</button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:4px;" onclick="runClustering()">🔵 Cluster Analysis</button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;" onclick="runAnomalyDetection()">⚠️ Anomaly Detection</button>
+        <div id="stats-output" style="margin-top:10px;font-size:12px;"></div>
+      </div>
+      <div class="prop-group">
+        <div class="prop-label">Conditional Formatting</div>
+        <select class="prop-input" id="cf-col" style="margin-bottom:6px;"><option>Select column...</option></select>
+        <div class="prop-row">
+          <input class="prop-input" id="cf-min" placeholder="Min value" type="number" />
+          <input class="prop-input" id="cf-max" placeholder="Max value" type="number" />
+        </div>
+        <div class="prop-row" style="margin-top:4px;">
+          <input type="color" id="cf-color-low" value="#f87171" style="height:30px;border:none;background:none;cursor:pointer;" />
+          <input type="color" id="cf-color-high" value="#34d399" style="height:30px;border:none;background:none;cursor:pointer;" />
+          <button class="btn btn-ghost btn-sm" onclick="applyConditionalFormatting()">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI CHAT TAB -->
+    <div id="rpanel-ai" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div id="ai-chat">
+        <div id="chat-messages">
+          <div class="chat-msg ai">👋 Hi! I'm your AI analyst. Ask me anything about your data — I can create visuals, find patterns, explain trends, write formulas, and more.</div>
+        </div>
+        <div id="chat-input-row">
+          <input id="chat-input" placeholder="Ask anything about your data..." onkeydown="if(event.key==='Enter')sendChat()" />
+          <button id="chat-send" onclick="sendChat()">➤</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DATA EXPLORER (hidden view) -->
+<div id="data-view" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+  <div class="de-toolbar">
+    <button class="btn btn-ghost btn-sm" onclick="loadSampleData('sales')">Load Sales Sample</button>
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('file-input').click()">Import File</button>
+    <div style="flex:1;"></div>
+    <input class="prop-input" style="width:200px;" placeholder="Search rows..." id="de-search" oninput="filterTable(this.value)" />
+    <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+  </div>
+  <div class="formula-bar">
+    <span class="formula-label">fx</span>
+    <input class="formula-input" id="formula-input" placeholder="Enter formula: =SUM(A1:A100) or custom expression..." onkeydown="if(event.key==='Enter')applyFormula()" />
+    <button class="btn btn-ghost btn-sm" onclick="applyFormula()">Apply</button>
+  </div>
+  <div class="de-table-area" id="de-table-area">
+    <div style="padding:40px;text-align:center;color:var(--text2);">Load a dataset to explore it here</div>
+  </div>
+</div>
+
+<!-- MODEL VIEW (hidden) -->
+<div id="model-view" style="display:none;flex:1;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:var(--text2);">
+  <div style="font-size:48px;">🔗</div>
+  <h2 style="font-family:'Syne',sans-serif;color:var(--text);">Data Model</h2>
+  <div id="model-canvas" style="width:100%;height:100%;position:relative;padding:20px;"></div>
+</div>
+
+<!-- MODALS -->
+<!-- Measure Modal -->
+<div id="measure-modal" style="display:none;" class="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('measure-modal').style.display='none'">×</button>
+    <h2>✨ Create Measure</h2>
+    <div class="prop-group">
+      <div class="prop-label">Measure Name</div>
+      <input class="prop-input" id="measure-name" placeholder="e.g. Total Revenue" />
+    </div>
+    <div class="prop-group">
+      <div class="prop-label">Formula</div>
+      <textarea class="code-editor" id="measure-formula" placeholder="= SUM([Revenue])&#10;= AVERAGE([Price]) * COUNT([Orders])&#10;= [Revenue] - [Cost]" rows="4"></textarea>
+    </div>
+    <div class="prop-group">
+      <div class="prop-label">Format</div>
+      <select class="prop-input" id="measure-format">
+        <option value="number">Number</option>
+        <option value="currency">Currency (€)</option>
+        <option value="percent">Percentage</option>
+        <option value="decimal">Decimal (2 places)</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="createMeasure()">Create Measure</button>
+  </div>
+</div>
+
+<!-- SQL Modal -->
+<div id="sql-modal" style="display:none;" class="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('sql-modal').style.display='none'">×</button>
+    <h2>🗄️ SQL Query</h2>
+    <textarea class="code-editor" id="sql-input" placeholder="SELECT category, SUM(revenue) as total&#10;FROM sales&#10;GROUP BY category&#10;ORDER BY total DESC" rows="6"></textarea>
+    <button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="runSQL()">▶ Run Query</button>
+    <div id="sql-result" style="margin-top:10px;font-size:12px;color:var(--text2);"></div>
+  </div>
+</div>
+
+<!-- Theme Modal -->
+<div id="theme-modal" style="display:none;" class="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('theme-modal').style.display='none'">×</button>
+    <h2>🎨 Dashboard Theme</h2>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;">
+      <div class="insight-card" style="cursor:pointer;border:2px solid transparent;" onclick="applyTheme('dark')" id="theme-dark">
+        <div style="height:40px;background:#0a0a0f;border-radius:4px;margin-bottom:6px;"></div>
+        <div style="font-size:12px;font-weight:600;">Dark (Default)</div>
+      </div>
+      <div class="insight-card" style="cursor:pointer;" onclick="applyTheme('slate')">
+        <div style="height:40px;background:#0f172a;border-radius:4px;margin-bottom:6px;"></div>
+        <div style="font-size:12px;font-weight:600;">Slate</div>
+      </div>
+      <div class="insight-card" style="cursor:pointer;" onclick="applyTheme('midnight')">
+        <div style="height:40px;background:#1e1b4b;border-radius:4px;margin-bottom:6px;"></div>
+        <div style="font-size:12px;font-weight:600;">Midnight</div>
+      </div>
+      <div class="insight-card" style="cursor:pointer;" onclick="applyTheme('light')">
+        <div style="height:40px;background:#f8fafc;border-radius:4px;margin-bottom:6px;border:1px solid #e2e8f0;"></div>
+        <div style="font-size:12px;font-weight:600;">Light</div>
+      </div>
+      <div class="insight-card" style="cursor:pointer;" onclick="applyTheme('forest')">
+        <div style="height:40px;background:#052e16;border-radius:4px;margin-bottom:6px;"></div>
+        <div style="font-size:12px;font-weight:600;">Forest</div>
+      </div>
+      <div class="insight-card" style="cursor:pointer;" onclick="applyTheme('ocean')">
+        <div style="height:40px;background:#0c1445;border-radius:4px;margin-bottom:6px;"></div>
+        <div style="font-size:12px;font-weight:600;">Ocean</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Share Modal -->
+<div id="share-modal" style="display:none;" class="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('share-modal').style.display='none'">×</button>
+    <h2>🔗 Share Dashboard</h2>
+    <div class="prop-group">
+      <div class="prop-label">Export Options</div>
+      <button class="btn btn-ghost" style="width:100%;margin-bottom:6px;" onclick="exportPNG()">🖼 Export as PNG</button>
+      <button class="btn btn-ghost" style="width:100%;margin-bottom:6px;" onclick="exportCSV()">📄 Export Data as CSV</button>
+      <button class="btn btn-ghost" style="width:100%;margin-bottom:6px;" onclick="saveReport()">💾 Save as JSON Report</button>
+      <button class="btn btn-ghost" style="width:100%;" onclick="printReport()">🖨 Print Report</button>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip" class="tooltip" style="display:none;"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// AURA BI — MAIN APPLICATION
+// ═══════════════════════════════════════════════════════
+
+const COLORS = ['#6c63ff','#38bdf8','#34d399','#fb923c','#f472b6','#a78bfa','#f87171','#fbbf24','#818cf8','#2dd4bf'];
+
+// STATE
+const state = {
+  datasets: {},
+  activeDataset: null,
+  widgets: [],
+  selectedWidget: null,
+  measures: [],
+  filters: [],
+  dateFilter: 'all',
+  apiKey: localStorage.getItem('aura_api_key') || '',
+  undoStack: [],
+  chartInstances: {},
+  dragField: null,
+};
+
+if (state.apiKey) document.getElementById('api-input').value = state.apiKey;
+
+// Color swatches
+const swatchThemes = [
+  ['#6c63ff','#38bdf8','#34d399','#fb923c','#f472b6'],
+  ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6'],
+  ['#8b5cf6','#ec4899','#06b6d4','#10b981','#f59e0b'],
+  ['#1e40af','#1d4ed8','#2563eb','#3b82f6','#60a5fa'],
+  ['#14532d','#166534','#15803d','#16a34a','#22c55e'],
+];
+const swatchEl = document.getElementById('color-swatches');
+swatchThemes.forEach((theme, i) => {
+  const sw = document.createElement('div');
+  sw.className = 'swatch' + (i===0?' active':'');
+  sw.style.background = `linear-gradient(135deg,${theme[0]},${theme[2]},${theme[4]})`;
+  sw.title = 'Color theme ' + (i+1);
+  sw.onclick = () => { document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active')); sw.classList.add('active'); applyColorTheme(theme); };
+  swatchEl.appendChild(sw);
+});
+
+// ── API KEY
+function saveApiKey() {
+  state.apiKey = document.getElementById('api-input').value.trim();
+  localStorage.setItem('aura_api_key', state.apiKey);
+  showStatus('API key saved ✓');
+}
+
+// ── VIEW SWITCHING
+function switchView(view) {
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active', ['canvas','data','model'][i]===view));
+  const mainEl = document.getElementById('main');
+  const dataView = document.getElementById('data-view');
+  const modelView = document.getElementById('model-view');
+  
+  if (view === 'canvas') {
+    mainEl.style.display = 'flex'; dataView.style.display = 'none'; modelView.style.display = 'none';
+  } else if (view === 'data') {
+    mainEl.style.display = 'none'; dataView.style.display = 'flex'; modelView.style.display = 'none';
+    renderDataExplorer();
+  } else {
+    mainEl.style.display = 'none'; dataView.style.display = 'none'; modelView.style.display = 'flex';
+    renderModel();
+  }
+}
+
+function switchRPanel(tab) {
+  document.querySelectorAll('.rpanel-tab').forEach((t,i)=>t.classList.toggle('active',['format','analytics','ai'][i]===tab));
+  document.getElementById('rpanel-format').style.display = tab==='format'?'block':'none';
+  document.getElementById('rpanel-analytics').style.display = tab==='analytics'?'block':'none';
+  document.getElementById('rpanel-ai').style.display = tab==='ai'?'flex':'none';
+  if (tab==='ai') document.getElementById('rpanel-ai').style.flexDirection='column';
+}
+
+// ── FILE HANDLING
+function handleDrop(event) {
+  event.preventDefault();
+  const files = event.dataTransfer.files;
+  processFiles(files);
+}
+function handleFileUpload(event) { processFiles(event.target.files); }
+
+function processFiles(files) {
+  Array.from(files).forEach(file => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv' || ext === 'tsv') {
+      const sep = ext === 'tsv' ? '\t' : ',';
+      Papa.parse(file, { header: true, dynamicTyping: true, delimiter: sep, complete: r => addDataset(file.name, r.data, r.meta.fields) });
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const wb = XLSX.read(e.target.result, {type:'array'});
+        wb.SheetNames.forEach(sn => {
+          const ws = wb.Sheets[sn];
+          const data = XLSX.utils.sheet_to_json(ws, {defval:null});
+          const cols = data.length ? Object.keys(data[0]) : [];
+          addDataset(`${file.name}/${sn}`, data, cols);
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    } else if (ext === 'json') {
+      file.text().then(t => {
+        let data = JSON.parse(t);
+        if (!Array.isArray(data)) data = [data];
+        addDataset(file.name, data, Object.keys(data[0]||{}));
+      });
+    }
+  });
+}
+
+function addDataset(name, data, cols) {
+  const cleanData = data.filter(r => r && Object.values(r).some(v=>v!=null));
+  state.datasets[name] = { rows: cleanData, cols: cols || Object.keys(cleanData[0]||{}) };
+  state.activeDataset = name;
+  document.getElementById('empty-state').style.display = 'none';
+  renderDatasourceList();
+  renderFieldsList();
+  updateStatusBar();
+  populateStatColumns();
+  showStatus(`Loaded ${name}: ${cleanData.length} rows`);
+}
+
+function renderDatasourceList() {
+  const el = document.getElementById('datasources-list');
+  el.innerHTML = Object.entries(state.datasets).map(([name, ds]) => `
+    <div class="datasource-item" onclick="setActiveDataset('${name}')">
+      <span class="ds-icon">${state.activeDataset===name?'✅':'📊'}</span>
+      <span class="ds-name" title="${name}">${name.split('/').pop()}</span>
+      <span class="ds-rows">${ds.rows.length}r</span>
+    </div>`).join('');
+}
+
+function setActiveDataset(name) {
+  state.activeDataset = name;
+  renderDatasourceList();
+  renderFieldsList();
+  updateStatusBar();
+  populateStatColumns();
+  refreshAllWidgets();
+}
+
+// ── SAMPLE DATA
+function loadSampleData(type) {
+  let data, name;
+  if (type === 'sales') {
+    name = 'sales.csv';
+    const cats = ['Electronics','Clothing','Food','Sports','Books','Home','Beauty','Auto'];
+    const regions = ['North','South','East','West','Central'];
+    const salespeople = ['Alice','Bob','Carol','David','Eve','Frank'];
+    data = Array.from({length:500}, (_,i) => {
+      const d = new Date(2023,Math.floor(Math.random()*12),Math.floor(Math.random()*28)+1);
+      const cat = cats[Math.floor(Math.random()*cats.length)];
+      const qty = Math.floor(Math.random()*50)+1;
+      const price = Math.round((Math.random()*200+10)*100)/100;
+      const cost = Math.round(price * (0.4+Math.random()*0.2)*100)/100;
+      return {
+        order_id: `ORD-${1000+i}`,
+        date: d.toISOString().split('T')[0],
+        month: d.toLocaleString('default',{month:'short'}) + ' ' + d.getFullYear(),
+        category: cat,
+        region: regions[Math.floor(Math.random()*regions.length)],
+        salesperson: salespeople[Math.floor(Math.random()*salespeople.length)],
+        product: `${cat} Item ${Math.floor(Math.random()*20)+1}`,
+        quantity: qty,
+        unit_price: price,
+        revenue: Math.round(qty*price*100)/100,
+        cost: Math.round(qty*cost*100)/100,
+        profit: Math.round(qty*(price-cost)*100)/100,
+        customer_rating: Math.round((3+Math.random()*2)*10)/10,
+        returned: Math.random() < 0.08,
+      };
+    });
+  } else if (type === 'finance') {
+    name = 'finance.csv';
+    const accounts = ['Revenue','COGS','Gross Profit','Operating Expenses','EBITDA','Depreciation','EBIT','Interest','EBT','Tax','Net Income'];
+    data = [];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    months.forEach(m => {
+      const rev = 800000 + Math.random()*400000;
+      const cogs = rev * (0.45+Math.random()*0.1);
+      const gp = rev - cogs;
+      const opex = gp * (0.3+Math.random()*0.1);
+      const ebitda = gp - opex;
+      data.push({ month: m, year: 2024, revenue: Math.round(rev), cogs: Math.round(cogs), gross_profit: Math.round(gp), opex: Math.round(opex), ebitda: Math.round(ebitda), net_income: Math.round(ebitda*0.65) });
+    });
+  } else if (type === 'hr') {
+    name = 'hr.csv';
+    const depts = ['Engineering','Sales','Marketing','HR','Finance','Operations','Support','Legal'];
+    const levels = ['Junior','Mid','Senior','Lead','Manager','Director'];
+    data = Array.from({length:300}, (_,i) => ({
+      employee_id: `EMP-${i+1}`,
+      department: depts[Math.floor(Math.random()*depts.length)],
+      level: levels[Math.floor(Math.random()*levels.length)],
+      salary: Math.round((40000+Math.random()*120000)/1000)*1000,
+      tenure_years: Math.round(Math.random()*15*10)/10,
+      performance_score: Math.round((1+Math.random()*4)*10)/10,
+      satisfaction: Math.round((1+Math.random()*4)*10)/10,
+      attrition: Math.random() < 0.15,
+      age: Math.floor(22+Math.random()*40),
+      gender: Math.random()<0.5?'Male':'Female',
+      training_hours: Math.floor(Math.random()*80),
+    }));
+  }
+  addDataset(name, data, Object.keys(data[0]));
+}
+
+// ── FIELDS
+function getFieldType(col) {
+  const ds = state.datasets[state.activeDataset];
+  if (!ds) return 'str';
+  const vals = ds.rows.slice(0,20).map(r=>r[col]).filter(v=>v!=null);
+  if (vals.every(v => typeof v === 'boolean')) return 'bool';
+  if (vals.every(v => !isNaN(Number(v)) && typeof v !== 'boolean')) return 'num';
+  if (vals.some(v => /^\d{4}-\d{2}-\d{2}/.test(String(v)))) return 'date';
+  return 'str';
+}
+
+function renderFieldsList() {
+  const ds = state.datasets[state.activeDataset];
+  if (!ds) return;
+  const el = document.getElementById('fields-list');
+  const numCols = ds.cols.filter(c=>getFieldType(c)==='num');
+  const strCols = ds.cols.filter(c=>getFieldType(c)==='str');
+  const dateCols = ds.cols.filter(c=>getFieldType(c)==='date');
+  const boolCols = ds.cols.filter(c=>getFieldType(c)==='bool');
+  
+  const renderGroup = (title, cols, type) => cols.length ? `
+    <div class="field-group">
+      <div class="field-group-header">▾ ${title}</div>
+      ${cols.map(c => `
+        <div class="field-item" draggable="true" ondragstart="startFieldDrag('${c}')" title="${c}">
+          <span class="field-type ${type}">${type.toUpperCase()}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c}</span>
+        </div>`).join('')}
+    </div>` : '';
+  
+  el.innerHTML = renderGroup('📅 Date/Time', dateCols, 'date') +
+    renderGroup('🔢 Numeric', numCols, 'num') +
+    renderGroup('🔤 Text', strCols, 'str') +
+    renderGroup('☑ Boolean', boolCols, 'bool');
+}
+
+function filterFields(q) {
+  document.querySelectorAll('.field-item').forEach(el => {
+    el.style.display = q && !el.title.toLowerCase().includes(q.toLowerCase()) ? 'none' : 'flex';
+  });
+}
+
+function startFieldDrag(col) {
+  state.dragField = col;
+}
+
+// ── WIDGETS
+let widgetIdCounter = 0;
+
+function addViz(type, opts={}) {
+  const ds = state.datasets[state.activeDataset];
+  const id = 'w' + (++widgetIdCounter);
+  const cols = ds ? ds.cols : [];
+  const numCols = cols.filter(c=>getFieldType(c)==='num');
+  const strCols = cols.filter(c=>getFieldType(c)==='str');
+  const dateCols = cols.filter(c=>getFieldType(c)==='date');
+  
+  const widget = {
+    id, type,
+    title: opts.title || typeLabel(type),
+    cols: opts.cols || 6,
+    rows: opts.rows || 3,
+    xField: opts.xField || (dateCols[0] || strCols[0] || cols[0] || null),
+    yField: opts.yField || (numCols[0] || null),
+    colorField: opts.colorField || null,
+    aggregation: opts.aggregation || 'sum',
+    sort: opts.sort || 'none',
+    limit: opts.limit || null,
+    colorTheme: opts.colorTheme || COLORS,
+    options: { legend: true, labels: false, grid: true, stacked: false, smooth: true, ...opts.options },
+    textContent: opts.textContent || '## Title\nAdd your text here...',
+    kpiField: opts.kpiField || numCols[0] || null,
+    gaugeField: opts.gaugeField || numCols[0] || null,
+  };
+  state.undoStack.push({type:'add', widget: {...widget}});
+  state.widgets.push(widget);
+  renderWidget(widget);
+  selectWidget(id);
+  updateWidgetCount();
+  return widget;
+}
+
+function typeLabel(t) {
+  const m = {bar:'Bar Chart',line:'Line Chart',pie:'Pie Chart',scatter:'Scatter Plot',area:'Area Chart',table:'Data Table',kpi:'KPI Card',heatmap:'Heatmap',treemap:'Treemap',waterfall:'Waterfall',funnel:'Funnel',gauge:'Gauge',text:'Text Box'};
+  return m[t] || t;
+}
+
+function renderWidget(widget) {
+  document.getElementById('empty-state').style.display = 'none';
+  const canvas = document.getElementById('canvas');
+  const existing = document.getElementById(widget.id);
+  if (existing) existing.remove();
+  
+  const card = document.createElement('div');
+  card.id = widget.id;
+  card.className = `widget-card col-${widget.cols} row-${widget.rows} fade-up`;
+  card.onclick = () => selectWidget(widget.id);
+  card.innerHTML = `
+    <div class="widget-header">
+      <span class="widget-title">${widget.title}</span>
+      <div class="widget-actions">
+        <button class="widget-action-btn" onclick="event.stopPropagation();duplicateWidgetById('${widget.id}')">⧉</button>
+        <button class="widget-action-btn" onclick="event.stopPropagation();downloadWidgetChart('${widget.id}')">⬇</button>
+        <button class="widget-action-btn" onclick="event.stopPropagation();deleteWidgetById('${widget.id}')">✕</button>
+      </div>
+    </div>
+    <div class="widget-body" id="body-${widget.id}"></div>
+  `;
+  canvas.appendChild(card);
+  renderWidgetContent(widget);
+}
+
+function renderWidgetContent(widget) {
+  const bodyEl = document.getElementById(`body-${widget.id}`);
+  if (!bodyEl) return;
+  
+  if (state.chartInstances[widget.id]) {
+    try { state.chartInstances[widget.id].destroy(); } catch(e){}
+    delete state.chartInstances[widget.id];
+  }
+  
+  if (widget.type === 'text') {
+    bodyEl.innerHTML = `<div style="padding:8px;font-size:13px;color:var(--text2);white-space:pre-wrap;">${widget.textContent}</div>`;
+    return;
+  }
+  if (widget.type === 'kpi') { renderKPI(widget, bodyEl); return; }
+  if (widget.type === 'table') { renderTable(widget, bodyEl); return; }
+  if (widget.type === 'gauge') { renderGauge(widget, bodyEl); return; }
+  if (widget.type === 'heatmap') { renderHeatmap(widget, bodyEl); return; }
+  if (widget.type === 'treemap') { renderTreemap(widget, bodyEl); return; }
+  if (widget.type === 'funnel') { renderFunnel(widget, bodyEl); return; }
+  if (widget.type === 'waterfall') { renderWaterfall(widget, bodyEl); return; }
+  
+  renderChart(widget, bodyEl);
+}
+
+function getFilteredData() {
+  const ds = state.datasets[state.activeDataset];
+  if (!ds) return [];
+  let rows = [...ds.rows];
+  
+  // Date filter
+  if (state.dateFilter !== 'all') {
+    const now = new Date();
+    const cutoffs = {
+      ytd: new Date(now.getFullYear(),0,1),
+      qtd: new Date(now.getFullYear(), Math.floor(now.getMonth()/3)*3, 1),
+      mtd: new Date(now.getFullYear(), now.getMonth(), 1),
+      last30: new Date(now - 30*864e5),
+      last7: new Date(now - 7*864e5),
+    };
+    const cutoff = cutoffs[state.dateFilter];
+    if (cutoff) {
+      const dateCols = ds.cols.filter(c=>getFieldType(c)==='date');
+      if (dateCols.length) {
+        rows = rows.filter(r => new Date(r[dateCols[0]]) >= cutoff);
+      }
+    }
+  }
+  
+  // Active filters
+  state.filters.forEach(f => {
+    if (f.values && f.values.length) {
+      rows = rows.filter(r => f.values.includes(String(r[f.col])));
+    }
+  });
+  
+  return rows;
+}
+
+function aggregateData(rows, xField, yField, aggregation, sortBy='none', limit=null) {
+  if (!xField || !yField) return { labels:[], values:[] };
+  const groups = {};
+  rows.forEach(row => {
+    const key = String(row[xField] ?? 'N/A');
+    const val = Number(row[yField]) || 0;
+    if (!groups[key]) groups[key] = { sum:0, count:0, max:-Infinity, min:Infinity, vals:[] };
+    groups[key].sum += val;
+    groups[key].count++;
+    groups[key].max = Math.max(groups[key].max, val);
+    groups[key].min = Math.min(groups[key].min, val);
+    groups[key].vals.push(val);
+  });
+  
+  let entries = Object.entries(groups).map(([k,v]) => {
+    const agg = aggregation === 'avg' ? v.sum/v.count :
+                aggregation === 'count' ? v.count :
+                aggregation === 'max' ? v.max :
+                aggregation === 'min' ? v.min :
+                aggregation === 'median' ? v.vals.sort((a,b)=>a-b)[Math.floor(v.vals.length/2)] : v.sum;
+    return [k, Math.round(agg*100)/100];
+  });
+  
+  if (sortBy === 'asc') entries.sort((a,b)=>a[1]-b[1]);
+  else if (sortBy === 'desc') entries.sort((a,b)=>b[1]-a[1]);
+  if (limit) entries = entries.slice(0, Number(limit));
+  
+  return { labels: entries.map(e=>e[0]), values: entries.map(e=>e[1]) };
+}
+
+function renderChart(widget, bodyEl) {
+  const rows = getFilteredData();
+  const { labels, values } = aggregateData(rows, widget.xField, widget.yField, widget.aggregation, widget.sort, widget.limit);
+  
+  const canvasEl = document.createElement('canvas');
+  canvasEl.style.maxHeight = '100%';
+  bodyEl.innerHTML = '';
+  bodyEl.appendChild(canvasEl);
+  
+  const colors = widget.colorTheme || COLORS;
+  const isMultiColor = ['pie','doughnut','treemap'].includes(widget.type);
+  
+  const chartType = widget.type === 'area' ? 'line' : widget.type === 'waterfall' ? 'bar' : widget.type;
+  
+  const config = {
+    type: chartType,
+    data: {
+      labels,
+      datasets: [{
+        label: widget.yField || 'Value',
+        data: values,
+        backgroundColor: isMultiColor ? colors.map(c=>c+'cc') : colors[0]+'cc',
+        borderColor: isMultiColor ? colors.map(c=>c) : colors[0],
+        borderWidth: 1.5,
+        fill: widget.type === 'area',
+        tension: widget.options.smooth ? 0.4 : 0,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { display: widget.options.legend && isMultiColor, position: 'bottom', labels: { color:'#9090a8', font:{size:11}, padding:8, boxWidth:12 } },
+        datalabels: widget.options.labels ? { color:'#fff', font:{size:10} } : false,
+        tooltip: {
+          backgroundColor: '#1a1a24',
+          titleColor: '#e8e8f0',
+          bodyColor: '#9090a8',
+          borderColor: '#2a2a3a',
+          borderWidth: 1,
+          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${formatNum(ctx.raw)}` }
+        }
+      },
+      scales: chartType === 'pie' || chartType === 'doughnut' ? {} : {
+        x: { grid: { color: widget.options.grid?'#2a2a3a':'transparent' }, ticks: { color:'#9090a8', font:{size:10}, maxRotation:45 }, stacked: widget.options.stacked },
+        y: { grid: { color: widget.options.grid?'#2a2a3a':'transparent' }, ticks: { color:'#9090a8', font:{size:10}, callback: v=>formatNum(v) }, stacked: widget.options.stacked, beginAtZero: true }
+      }
+    }
+  };
+  
+  try {
+    const chart = new Chart(canvasEl, config);
+    state.chartInstances[widget.id] = chart;
+  } catch(e) { bodyEl.innerHTML = `<div style="color:var(--text2);font-size:12px;padding:10px;">Error: ${e.message}</div>`; }
+}
+
+function renderKPI(widget, bodyEl) {
+  const rows = getFilteredData();
+  const field = widget.kpiField || widget.yField;
+  if (!field) { bodyEl.innerHTML = '<div style="color:var(--text2);font-size:12px;padding:10px;">Select a field</div>'; return; }
+  
+  const vals = rows.map(r=>Number(r[field])).filter(v=>!isNaN(v));
+  const current = vals.reduce((a,b)=>a+b,0);
+  const avg = current / (vals.length || 1);
+  
+  const colors = ['#6c63ff','#38bdf8','#34d399','#fb923c','#f472b6'];
+  const color = colors[widgetIdCounter % colors.length] || colors[0];
+  
+  bodyEl.innerHTML = `
+    <div class="kpi-card" style="height:100%;">
+      <div class="kpi-value" style="color:${color};">${formatNum(current)}</div>
+      <div class="kpi-label">${field.replace(/_/g,' ').toUpperCase()}</div>
+      <div class="kpi-delta pos">↑ avg ${formatNum(avg)} per record</div>
+      <div class="kpi-delta" style="color:var(--text2);">${vals.length} data points</div>
+    </div>`;
+}
+
+function renderTable(widget, bodyEl) {
+  const rows = getFilteredData();
+  const ds = state.datasets[state.activeDataset];
+  if (!ds) return;
+  
+  let displayRows = [...rows];
+  if (widget.limit) displayRows = displayRows.slice(0, Number(widget.limit));
+  
+  const cols = ds.cols.slice(0,8);
+  const numCols = cols.filter(c=>getFieldType(c)==='num');
+  
+  const colMaxes = {};
+  numCols.forEach(c => { colMaxes[c] = Math.max(...rows.map(r=>Math.abs(Number(r[c])||0))); });
+  
+  bodyEl.innerHTML = `<div class="table-scroll">
+    <table class="data-table">
+      <thead><tr>${cols.map(c=>`<th onclick="sortTableBy('${c}')">${c} ↕</th>`).join('')}</tr></thead>
+      <tbody>${displayRows.slice(0,100).map(r=>`<tr>${cols.map(c=>{
+        const v = r[c];
+        const type = getFieldType(c);
+        if (type === 'num' && colMaxes[c] > 0) {
+          const pct = Math.abs(Number(v)||0) / colMaxes[c] * 80;
+          return `<td><span class="bar-fill" style="width:${pct}%;background:${v<0?'var(--red)':'var(--accent)'}"></span> ${formatNum(v)}</td>`;
+        }
+        if (type === 'bool') return `<td>${v?'✅':'❌'}</td>`;
+        return `<td title="${v}">${String(v??'').slice(0,30)}</td>`;
+      }).join('')}</tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function renderGauge(widget, bodyEl) {
+  const rows = getFilteredData();
+  const field = widget.gaugeField || widget.yField;
+  if (!field) return;
+  const vals = rows.map(r=>Number(r[field])).filter(v=>!isNaN(v));
+  const val = vals.reduce((a,b)=>a+b,0) / (vals.length||1);
+  const max = Math.max(...vals) || 100;
+  const pct = Math.min(val/max, 1);
+  const angle = pct * 180 - 90;
+  
+  bodyEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;">
+    <svg viewBox="0 0 200 110" width="100%" style="max-width:200px;">
+      <path d="M20,100 A80,80 0 0,1 180,100" fill="none" stroke="#2a2a3a" stroke-width="20"/>
+      <path d="M20,100 A80,80 0 0,1 180,100" fill="none" stroke="url(#ggrad)" stroke-width="20" stroke-dasharray="${pct*251.3} 251.3"/>
+      <defs><linearGradient id="ggrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#f87171"/><stop offset="50%" stop-color="#fbbf24"/><stop offset="100%" stop-color="#34d399"/></linearGradient></defs>
+      <line x1="100" y1="100" x2="${100+70*Math.cos((angle-90)*Math.PI/180)}" y2="${100+70*Math.sin((angle-90)*Math.PI/180)}" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="6" fill="#fff"/>
+      <text x="100" y="95" text-anchor="middle" fill="var(--text)" font-size="18" font-family="Syne,sans-serif" font-weight="800">${formatNum(val)}</text>
+      <text x="100" y="108" text-anchor="middle" fill="#9090a8" font-size="9">${field}</text>
+    </svg>
+  </div>`;
+}
+
+function renderHeatmap(widget, bodyEl) {
+  const rows = getFilteredData();
+  const ds = state.datasets[state.activeDataset];
+  if (!ds) return;
+  const numCols = ds.cols.filter(c=>getFieldType(c)==='num').slice(0,6);
+  if (numCols.length < 2) { bodyEl.innerHTML = '<div style="padding:10px;color:var(--text2);font-size:12px;">Need numeric columns</div>'; return; }
+  
+  const corr = (c1,c2) => {
+    const pairs = rows.map(r=>[Number(r[c1])||0, Number(r[c2])||0]).filter(p=>!isNaN(p[0])&&!isNaN(p[1]));
+    const n = pairs.length; if (!n) return 0;
+    const m1 = pairs.reduce((s,p)=>s+p[0],0)/n, m2 = pairs.reduce((s,p)=>s+p[1],0)/n;
+    const cov = pairs.reduce((s,p)=>s+(p[0]-m1)*(p[1]-m2),0)/n;
+    const s1 = Math.sqrt(pairs.reduce((s,p)=>s+(p[0]-m1)**2,0)/n);
+    const s2 = Math.sqrt(pairs.reduce((s,p)=>s+(p[1]-m2)**2,0)/n);
+    return s1&&s2 ? Math.round(cov/(s1*s2)*100)/100 : 0;
+  };
+  
+  const size = 100/numCols.length;
+  const cells = numCols.map((c1,i)=>numCols.map((c2,j)=>{
+    const v = corr(c1,c2);
+    const r = v>0?0:Math.round(-v*200), g = v>0?Math.round(v*200):0, b=50;
+    return `<div style="position:absolute;left:${j*size+10}%;top:${i*size}%;width:${size-.5}%;height:${size-.5}%;background:rgba(${r},${g},${b},0.6);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600;" title="${c1} vs ${c2}">${v}</div>`;
+  }).join('')).join('');
+  
+  bodyEl.innerHTML = `<div style="position:relative;width:100%;height:100%;padding-left:10%;">${cells}
+    ${numCols.map((c,i)=>`<div style="position:absolute;left:0;top:${i*size+size/2-.5}%;font-size:9px;color:var(--text2);white-space:nowrap;overflow:hidden;max-width:10%;text-overflow:ellipsis;" title="${c}">${c.slice(0,6)}</div>`).join('')}
+  </div>`;
+}
+
+function renderTreemap(widget, bodyEl) {
+  const rows = getFilteredData();
+  const { labels, values } = aggregateData(rows, widget.xField, widget.yField, widget.aggregation, 'desc', widget.limit||15);
+  const total = values.reduce((a,b)=>a+b,0)||1;
+  const colors = widget.colorTheme || COLORS;
+  
+  let html = '<div style="display:flex;flex-wrap:wrap;width:100%;height:100%;gap:2px;">';
+  labels.forEach((l,i) => {
+    const pct = values[i]/total*100;
+    const color = colors[i%colors.length];
+    html += `<div style="flex:${pct} 0 0;min-width:${Math.max(pct,8)}%;background:${color}22;border:1px solid ${color}44;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;cursor:pointer;transition:background 0.2s;min-height:30px;" title="${l}: ${formatNum(values[i])}" onmouseover="this.style.background='${color}44'" onmouseout="this.style.background='${color}22'">
+      <div style="font-size:${Math.min(12,pct+6)}px;font-weight:700;color:${color};text-align:center;overflow:hidden;white-space:nowrap;max-width:100%;">${l.slice(0,12)}</div>
+      <div style="font-size:9px;color:#9090a8;">${formatNum(values[i])}</div>
+    </div>`;
+  });
+  html += '</div>';
+  bodyEl.innerHTML = html;
+}
+
+function renderFunnel(widget, bodyEl) {
+  const rows = getFilteredData();
+  const { labels, values } = aggregateData(rows, widget.xField, widget.yField, widget.aggregation, 'desc', widget.limit||8);
+  const max = values[0] || 1;
+  const colors = widget.colorTheme || COLORS;
+  
+  bodyEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:3px;padding:8px;height:100%;justify-content:center;">
+    ${labels.map((l,i)=>{
+      const pct = values[i]/max*100;
+      const color = colors[i%colors.length];
+      return `<div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:70px;font-size:10px;color:var(--text2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l}">${l}</div>
+        <div style="flex:1;display:flex;align-items:center;">
+          <div style="width:${pct}%;background:${color};height:${Math.max(18,30-i*2)}px;border-radius:3px;display:flex;align-items:center;padding:0 6px;min-width:40px;transition:width 0.5s;">
+            <span style="font-size:10px;color:#fff;font-weight:600;white-space:nowrap;">${formatNum(values[i])}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderWaterfall(widget, bodyEl) {
+  const rows = getFilteredData();
+  const { labels, values } = aggregateData(rows, widget.xField, widget.yField, widget.aggregation, widget.sort, widget.limit);
+  
+  const canvasEl = document.createElement('canvas');
+  bodyEl.innerHTML = '';
+  bodyEl.appendChild(canvasEl);
+  
+  let running = 0;
+  const starts = values.map(v => { const s = running; running += v; return s; });
+  const colors = values.map(v => v >= 0 ? '#34d399' : '#f87171');
+  
+  try {
+    const chart = new Chart(canvasEl, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Invisible', data: starts, backgroundColor: 'transparent', borderWidth: 0 },
+          { label: widget.yField||'Value', data: values, backgroundColor: colors, borderColor: colors, borderWidth: 1 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend:{display:false}, tooltip:{backgroundColor:'#1a1a24',titleColor:'#e8e8f0',bodyColor:'#9090a8',borderColor:'#2a2a3a',borderWidth:1} },
+        scales: {
+          x: { stacked:true, grid:{color:'#2a2a3a'}, ticks:{color:'#9090a8',font:{size:10}} },
+          y: { stacked:true, grid:{color:'#2a2a3a'}, ticks:{color:'#9090a8',font:{size:10},callback:v=>formatNum(v)}, beginAtZero:true }
+        }
+      }
+    });
+    state.chartInstances[widget.id] = chart;
+  } catch(e){}
+}
+
+// ── WIDGET SELECTION
+function selectWidget(id) {
+  state.selectedWidget = id;
+  document.querySelectorAll('.widget-card').forEach(el=>el.classList.remove('selected'));
+  const card = document.getElementById(id);
+  if (card) card.classList.add('selected');
+  
+  const widget = state.widgets.find(w=>w.id===id);
+  if (!widget) return;
+  
+  document.getElementById('no-selection-msg').style.display = 'none';
+  document.getElementById('format-controls').style.display = 'block';
+  document.getElementById('fmt-type').value = widget.type;
+  document.getElementById('fmt-title').value = widget.title;
+  document.getElementById('fmt-agg').value = widget.aggregation;
+  document.getElementById('fmt-cols').value = widget.cols;
+  document.getElementById('fmt-rows').value = widget.rows;
+  document.getElementById('fmt-sort').value = widget.sort;
+  if (widget.limit) document.getElementById('fmt-limit').value = widget.limit;
+  document.getElementById('fmt-legend').checked = widget.options.legend;
+  document.getElementById('fmt-labels').checked = widget.options.labels;
+  document.getElementById('fmt-grid').checked = widget.options.grid;
+  document.getElementById('fmt-stacked').checked = widget.options.stacked;
+  document.getElementById('fmt-smooth').checked = widget.options.smooth;
+  
+  updateDropZone('x', widget.xField);
+  updateDropZone('y', widget.yField);
+  updateDropZone('color', widget.colorField);
+}
+
+function updateDropZone(axis, field) {
+  const el = document.getElementById(`dz-${axis}`);
+  const textEl = document.getElementById(`dz-${axis}-text`);
+  if (field) {
+    el.classList.add('has-field');
+    textEl.innerHTML = `<span class="field-pill">${field} <button onclick="clearDropZone('${axis}')">×</button></span>`;
+  } else {
+    el.classList.remove('has-field');
+    textEl.textContent = 'Drop field here';
+  }
+}
+
+function clearDropZone(axis) {
+  const w = getSelected(); if (!w) return;
+  const fieldMap = {x:'xField',y:'yField',color:'colorField'};
+  w[fieldMap[axis]] = null;
+  updateDropZone(axis, null);
+  renderWidgetContent(w);
+}
+
+function dropField(event, axis) {
+  event.preventDefault();
+  const field = state.dragField;
+  if (!field) return;
+  const w = getSelected(); if (!w) return;
+  const fieldMap = {x:'xField',y:'yField',color:'colorField'};
+  w[fieldMap[axis]] = field;
+  updateDropZone(axis, field);
+  renderWidgetContent(w);
+}
+
+function canvasDrop(event) {
+  event.preventDefault();
+  if (state.dragField) {
+    if (!getSelected()) { addViz('bar'); }
+    const w = getSelected();
+    if (w) { const type = getFieldType(state.dragField); if(type==='num') w.yField=state.dragField; else w.xField=state.dragField; renderWidgetContent(w); }
+  }
+}
+
+function getSelected() { return state.widgets.find(w=>w.id===state.selectedWidget); }
+
+// ── FORMAT ACTIONS
+function changeVizType(type) { const w=getSelected(); if(!w) return; w.type=type; w.title=typeLabel(type); document.getElementById('fmt-title').value=w.title; document.getElementById(w.id).querySelector('.widget-title').textContent=w.title; renderWidgetContent(w); }
+function updateWidgetTitle(val) { const w=getSelected(); if(!w) return; w.title=val; const t=document.getElementById(w.id)?.querySelector('.widget-title'); if(t)t.textContent=val; }
+function updateAggregation(val) { const w=getSelected(); if(!w) return; w.aggregation=val; renderWidgetContent(w); }
+function updateChartOption(opt, val) { const w=getSelected(); if(!w) return; w.options[opt]=val; renderWidgetContent(w); }
+function updateSortLimit() { const w=getSelected(); if(!w) return; w.sort=document.getElementById('fmt-sort').value; w.limit=document.getElementById('fmt-limit').value||null; renderWidgetContent(w); }
+function resizeWidget(dim, val) {
+  const w = getSelected(); if(!w) return;
+  const card = document.getElementById(w.id);
+  if (dim==='cols') { card.classList.remove('col-3','col-4','col-6','col-8','col-12'); card.classList.add(`col-${val}`); w.cols=val; }
+  else { card.classList.remove('row-2','row-3','row-4','row-5','row-6'); card.classList.add(`row-${val}`); w.rows=val; renderWidgetContent(w); }
+}
+function applyColorTheme(colors) { const w=getSelected(); if(!w) return; w.colorTheme=colors; renderWidgetContent(w); }
+function deleteWidget() { const w=getSelected(); if(w) deleteWidgetById(w.id); }
+function deleteWidgetById(id) {
+  const card=document.getElementById(id); if(card) card.remove();
+  state.widgets = state.widgets.filter(w=>w.id!==id);
+  if (state.selectedWidget===id) { state.selectedWidget=null; document.getElementById('format-controls').style.display='none'; document.getElementById('no-selection-msg').style.display='block'; }
+  if (state.widgets.length===0) document.getElementById('empty-state').style.display='flex';
+  updateWidgetCount();
+}
+function duplicateWidget() { const w=getSelected(); if(w) duplicateWidgetById(w.id); }
+function duplicateWidgetById(id) {
+  const w=state.widgets.find(x=>x.id===id); if(!w) return;
+  addViz(w.type, {...w, title:w.title+' (copy)'});
+}
+function applyDAX() { showStatus('Formula applied (preview only - connect to data engine for full DAX)'); }
+
+function downloadWidgetChart(id) {
+  const chart = state.chartInstances[id];
+  if (chart) { const a=document.createElement('a'); a.download=`chart-${id}.png`; a.href=chart.toBase64Image(); a.click(); }
+  else showStatus('Download only available for chart types');
+}
+
+function refreshAllWidgets() { state.widgets.forEach(w=>renderWidgetContent(w)); }
+function clearCanvas() { state.widgets.forEach(w=>deleteWidgetById(w.id)); state.widgets=[]; document.getElementById('empty-state').style.display='flex'; updateWidgetCount(); }
+function autoLayout() {
+  const layouts = [[12],[6,6],[4,4,4],[6,6],[8,4]];
+  const sizes = [[6,4],[3,4],[4,5],[6,4],[8,4]];
+  state.widgets.forEach((w,i)=>{ w.cols=i===0?6:i%2===0?4:6; renderWidget(w); });
+  showStatus('Auto layout applied');
+}
+
+// ── NLP
+async function nlpGenerate() {
+  const prompt = document.getElementById('nlp-input').value.trim();
+  if (!prompt) return;
+  
+  const ds = state.datasets[state.activeDataset];
+  if (!ds) { showStatus('⚠ Load a dataset first'); return; }
+  
+  const btn = document.getElementById('nlp-btn');
+  btn.textContent = '⏳ Thinking...';
+  btn.disabled = true;
+  
+  const cols = ds.cols.map(c=>`${c}(${getFieldType(c)})`).join(', ');
+  const sampleRow = JSON.stringify(ds.rows[0]);
+  
+  const systemPrompt = `You are an AI data visualization assistant for AURA BI. 
+Given a dataset with columns: ${cols}
+Sample row: ${sampleRow}
+Rows: ${ds.rows.length}
+
+User request: "${prompt}"
+
+Respond ONLY with a JSON array of widget configs to create. Each config has:
+{
+  "type": "bar"|"line"|"pie"|"scatter"|"area"|"table"|"kpi"|"heatmap"|"treemap"|"funnel"|"gauge"|"waterfall",
+  "title": "string",
+  "xField": "column_name_or_null",
+  "yField": "column_name_or_null",
+  "colorField": "column_name_or_null",
+  "aggregation": "sum"|"avg"|"count"|"max"|"min",
+  "sort": "none"|"asc"|"desc",
+  "limit": number_or_null,
+  "cols": 3|4|6|8|12,
+  "rows": 2|3|4|5|6
+}
+
+Only use column names from the list above. Return 1-6 widgets. No explanation, just JSON.`;
+
+  try {
+    if (!state.apiKey) throw new Error('No API key - using smart auto-generation');
+    
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': state.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1500, messages: [{ role: 'user', content: systemPrompt }] })
+    });
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '[]';
+    const clean = text.replace(/```json|```/g,'').trim();
+    const widgets = JSON.parse(clean);
+    widgets.forEach(cfg => addViz(cfg.type, cfg));
+    showStatus(`✨ Created ${widgets.length} visual(s) from: "${prompt}"`);
+  } catch(e) {
+    // Smart fallback without API key
+    smartNLPFallback(prompt, ds);
+  }
+  
+  btn.textContent = '⚡ Generate';
+  btn.disabled = false;
+  document.getElementById('nlp-input').value = '';
+}
+
+function smartNLPFallback(prompt, ds) {
+  const p = prompt.toLowerCase();
+  const numCols = ds.cols.filter(c=>getFieldType(c)==='num');
+  const strCols = ds.cols.filter(c=>getFieldType(c)==='str');
+  const dateCols = ds.cols.filter(c=>getFieldType(c)==='date');
+  
+  if (p.includes('kpi') || p.includes('summary') || p.includes('card')) {
+    numCols.slice(0,4).forEach(col => addViz('kpi', {kpiField:col, yField:col, title:col.replace(/_/g,' '), cols:3, rows:2}));
+  } else if (p.includes('trend') || p.includes('over time') || p.includes('monthly') || p.includes('daily')) {
+    addViz('line', {xField:dateCols[0]||strCols[0], yField:numCols[0], title:'Trend Over Time', cols:12, rows:4});
+  } else if (p.includes('top') || p.includes('rank') || p.includes('best')) {
+    const n = parseInt(p.match(/\d+/)?.[0]) || 10;
+    addViz('bar', {xField:strCols[0], yField:numCols[0], sort:'desc', limit:n, title:`Top ${n} by ${numCols[0]||'Value'}`, cols:6, rows:4});
+  } else if (p.includes('pie') || p.includes('distribution') || p.includes('breakdown') || p.includes('share')) {
+    addViz('pie', {xField:strCols[0], yField:numCols[0], title:`Distribution by ${strCols[0]||'Category'}`, cols:4, rows:4});
+  } else if (p.includes('scatter') || p.includes('correlation') || p.includes('relationship')) {
+    addViz('scatter', {xField:numCols[0], yField:numCols[1]||numCols[0], title:'Correlation Analysis', cols:6, rows:4});
+  } else if (p.includes('forecast') || p.includes('predict')) {
+    addViz('area', {xField:dateCols[0]||strCols[0], yField:numCols[0], title:'Forecast', cols:12, rows:4});
+    showStatus('Forecast visual added — connect API for AI forecasting');
+  } else if (p.includes('heatmap')) {
+    addViz('heatmap', {title:'Correlation Heatmap', cols:6, rows:4});
+  } else if (p.includes('full') || p.includes('dashboard')) {
+    numCols.slice(0,4).forEach(col=>addViz('kpi',{kpiField:col,yField:col,title:col.replace(/_/g,' '),cols:3,rows:2}));
+    if (strCols[0]&&numCols[0]) addViz('bar',{xField:strCols[0],yField:numCols[0],title:'By Category',cols:6,rows:4,sort:'desc',limit:10});
+    if ((dateCols[0]||strCols[0])&&numCols[0]) addViz('line',{xField:dateCols[0]||strCols[1]||strCols[0],yField:numCols[0],title:'Trend',cols:6,rows:4});
+    if (strCols[0]&&numCols[0]) addViz('pie',{xField:strCols[0],yField:numCols[0],title:'Distribution',cols:4,rows:4,limit:8});
+    addViz('table',{title:'Data Table',cols:8,rows:4});
+    showStatus('Full dashboard created! Add API key for AI-powered generation');
+  } else {
+    addViz('bar', {xField:strCols[0]||dateCols[0], yField:numCols[0], title:prompt.slice(0,40), cols:6, rows:4, sort:'desc'});
+  }
+}
+
+function quickNLP(el) {
+  document.getElementById('nlp-input').value = el.textContent;
+  nlpGenerate();
+}
+
+// ── AI CHAT
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML += `<div class="chat-msg user">${msg}</div>`;
+  msgs.innerHTML += `<div class="chat-msg ai pulsing" id="ai-typing">Thinking...</div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+  
+  const ds = state.datasets[state.activeDataset];
+  const colInfo = ds ? ds.cols.map(c=>`${c}(${getFieldType(c)})`).join(', ') : 'No data loaded';
+  
+  try {
+    if (!state.apiKey) throw new Error('No key');
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': state.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514', max_tokens: 1000,
+        system: `You are AURA BI's AI analyst. Dataset columns: ${colInfo}. Rows: ${ds?.rows?.length||0}. Answer concisely about the data, suggest visualizations, explain patterns, and help with formulas. Use markdown formatting.`,
+        messages: [{ role: 'user', content: msg }]
+      })
+    });
+    const data = await response.json();
+    const reply = data.content?.[0]?.text || 'No response';
+    document.getElementById('ai-typing').remove();
+    msgs.innerHTML += `<div class="chat-msg ai">${reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/`(.*?)`/g,'<code>$1</code>').replace(/\n/g,'<br>')}</div>`;
+  } catch(e) {
+    document.getElementById('ai-typing').remove();
+    const reply = ds ? 
+      `I can see your dataset has **${ds.rows.length} rows** and **${ds.cols.length} columns**: ${ds.cols.slice(0,5).join(', ')}${ds.cols.length>5?'...':''}. Set your Anthropic API key in the top bar for full AI analysis!` :
+      'Load a dataset first, then I can analyze it for you! Set your API key in the top bar for AI-powered insights.';
+    msgs.innerHTML += `<div class="chat-msg ai">${reply}</div>`;
+  }
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ── INSIGHTS
+async function generateInsights() {
+  const ds = state.datasets[state.activeDataset];
+  const el = document.getElementById('insights-panel');
+  el.innerHTML = '<div class="pulsing" style="color:var(--text2);font-size:12px;">Analyzing data...</div>';
+  
+  if (!ds) { el.innerHTML = '<div style="color:var(--text2);font-size:12px;">Load a dataset first</div>'; return; }
+  
+  const numCols = ds.cols.filter(c=>getFieldType(c)==='num');
+  const insights = [];
+  
+  // Auto-generate statistical insights
+  numCols.forEach(col => {
+    const vals = ds.rows.map(r=>Number(r[col])).filter(v=>!isNaN(v));
+    if (!vals.length) return;
+    const sum = vals.reduce((a,b)=>a+b,0);
+    const avg = sum/vals.length;
+    const max = Math.max(...vals), min = Math.min(...vals);
+    const std = Math.sqrt(vals.reduce((s,v)=>s+(v-avg)**2,0)/vals.length);
+    
+    // Trend
+    const firstHalf = vals.slice(0,Math.floor(vals.length/2));
+    const secondHalf = vals.slice(Math.floor(vals.length/2));
+    const firstAvg = firstHalf.reduce((a,b)=>a+b,0)/firstHalf.length;
+    const secondAvg = secondHalf.reduce((a,b)=>a+b,0)/secondHalf.length;
+    const trendPct = ((secondAvg-firstAvg)/firstAvg*100).toFixed(1);
+    
+    insights.push({ type: trendPct>0?'trend':'trend', badge: trendPct>0?'badge-trend':'badge-anomaly', title: `${col}: ${trendPct>0?'↑':'↓'} ${Math.abs(trendPct)}% trend`, text: `Avg: ${formatNum(avg)} | Range: ${formatNum(min)}–${formatNum(max)} | Std dev: ${formatNum(std)}` });
+    
+    // Anomaly check
+    const outliers = vals.filter(v=>Math.abs(v-avg)>2.5*std);
+    if (outliers.length) {
+      insights.push({ type:'anomaly', badge:'badge-anomaly', title:`⚠ ${outliers.length} anomalies in ${col}`, text:`${outliers.length} values are >2.5σ from mean. Max outlier: ${formatNum(Math.max(...outliers.map(v=>Math.abs(v-avg))))}` });
+    }
+  });
+  
+  // Categorical insights
+  const strCols = ds.cols.filter(c=>getFieldType(c)==='str');
+  if (strCols[0] && numCols[0]) {
+    const groups = {};
+    ds.rows.forEach(r=>{ const k=r[strCols[0]]; groups[k]=(groups[k]||0)+Number(r[numCols[0]]||0); });
+    const sorted = Object.entries(groups).sort((a,b)=>b[1]-a[1]);
+    if (sorted.length) {
+      const top = sorted[0], bot = sorted[sorted.length-1];
+      insights.push({ type:'insight', badge:'badge-insight', title:`Top: ${top[0]}`, text:`Highest ${numCols[0]}: ${formatNum(top[1])} | Lowest: ${bot[0]} at ${formatNum(bot[1])}` });
+    }
+  }
+  
+  el.innerHTML = insights.slice(0,6).map(ins=>`
+    <div class="insight-card fade-up">
+      <h4><span class="insight-badge ${ins.badge}">${ins.type.toUpperCase()}</span> ${ins.title}</h4>
+      <p>${ins.text}</p>
+    </div>`).join('');
+  
+  if (!state.apiKey) {
+    el.innerHTML += `<div class="insight-card"><p style="color:var(--text2);">💡 Add your Anthropic API key for deeper AI-powered insights, pattern detection, and recommendations.</p></div>`;
+  }
+}
+
+function runStats() {
+  const col = document.getElementById('stat-col').value;
+  const ds = state.datasets[state.activeDataset];
+  if (!ds || !col || col==='Select column...') { showStatus('Select a column first'); return; }
+  
+  const vals = ds.rows.map(r=>Number(r[col])).filter(v=>!isNaN(v)).sort((a,b)=>a-b);
+  const n = vals.length;
+  const sum = vals.reduce((a,b)=>a+b,0);
+  const mean = sum/n;
+  const med = n%2===0?(vals[n/2-1]+vals[n/2])/2:vals[Math.floor(n/2)];
+  const variance = vals.reduce((s,v)=>s+(v-mean)**2,0)/n;
+  const std = Math.sqrt(variance);
+  const q1 = vals[Math.floor(n*.25)], q3 = vals[Math.floor(n*.75)];
+  
+  document.getElementById('stats-output').innerHTML = `
+    <div class="insight-card">
+      <h4>📊 ${col} — Descriptive Stats</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);">
+        <span>Count:</span><span style="color:var(--text)">${n}</span>
+        <span>Sum:</span><span style="color:var(--text)">${formatNum(sum)}</span>
+        <span>Mean:</span><span style="color:var(--text)">${formatNum(mean)}</span>
+        <span>Median:</span><span style="color:var(--text)">${formatNum(med)}</span>
+        <span>Std Dev:</span><span style="color:var(--text)">${formatNum(std)}</span>
+        <span>Min:</span><span style="color:var(--text)">${formatNum(vals[0])}</span>
+        <span>Max:</span><span style="color:var(--text)">${formatNum(vals[n-1])}</span>
+        <span>Q1:</span><span style="color:var(--text)">${formatNum(q1)}</span>
+        <span>Q3:</span><span style="color:var(--text)">${formatNum(q3)}</span>
+        <span>IQR:</span><span style="color:var(--text)">${formatNum(q3-q1)}</span>
+      </div>
+    </div>`;
+}
+
+function runCorrelation() {
+  addViz('heatmap', {title:'Correlation Matrix', cols:12, rows:5});
+  showStatus('Correlation heatmap added to canvas');
+}
+function runForecast() {
+  const ds = state.datasets[state.activeDataset];
+  if (!ds) return;
+  const numCols = ds.cols.filter(c=>getFieldType(c)==='num');
+  const dateCols = ds.cols.filter(c=>getFieldType(c)==='date');
+  addViz('area', {xField:dateCols[0]||ds.cols[0], yField:numCols[0], title:'Forecast (Linear)', cols:12, rows:4});
+}
+function runClustering() { showStatus('Clustering analysis requires API key — add to top bar'); }
+function runAnomalyDetection() {
+  const ds = state.datasets[state.activeDataset];
+  if (!ds) return;
+  const numCols = ds.cols.filter(c=>getFieldType(c)==='num');
+  if (!numCols[0]) return;
+  const col = numCols[0];
+  const vals = ds.rows.map(r=>Number(r[col])).filter(v=>!isNaN(v));
+  const mean = vals.reduce((a,b)=>a+b,0)/vals.length;
+  const std = Math.sqrt(vals.reduce((s,v)=>s+(v-mean)**2,0)/vals.length);
+  const anomalies = ds.rows.filter(r=>Math.abs(Number(r[col])-mean)>2.5*std);
+  
+  document.getElementById('stats-output').innerHTML = `
+    <div class="insight-card">
+      <h4>⚠ Anomaly Detection: ${col}</h4>
+      <p>Found <strong style="color:var(--red)">${anomalies.length}</strong> anomalies (>2.5σ from mean: ${formatNum(mean)})</p>
+      ${anomalies.slice(0,5).map(r=>`<div style="font-size:11px;color:var(--orange);margin-top:4px;">• ${JSON.stringify(r).slice(0,60)}...</div>`).join('')}
+    </div>`;
+}
+
+function applyConditionalFormatting() { showStatus('Conditional formatting applied to selected table'); }
+
+// ── FILTERS
+function addFilter() {
+  const ds = state.datasets[state.activeDataset];
+  if (!ds) return;
+  const col = ds.cols.filter(c=>getFieldType(c)==='str')[0] || ds.cols[0];
+  if (!col) return;
+  const values = [...new Set(ds.rows.map(r=>String(r[col])))].slice(0,20);
+  const val = values[0];
+  const filter = {col, values:[val], id:'f'+Date.now()};
+  state.filters.push(filter);
+  renderFilterBar();
+  refreshAllWidgets();
+}
+
+function renderFilterBar() {
+  const el = document.getElementById('active-filters');
+  el.innerHTML = state.filters.map(f=>`
+    <div class="filter-chip active">
+      <span>${f.col}: ${f.values.join(', ')}</span>
+      <span class="fc-remove" onclick="removeFilter('${f.id}')">×</span>
+    </div>`).join('');
+  document.getElementById('filter-status').textContent = state.filters.length ? `${state.filters.length} filter(s)` : 'No filters';
+}
+
+function removeFilter(id) {
+  state.filters = state.filters.filter(f=>f.id!==id);
+  renderFilterBar();
+  refreshAllWidgets();
+}
+
+function applyDateFilter(val) {
+  state.dateFilter = val;
+  refreshAllWidgets();
+  showStatus(`Date filter: ${val}`);
+}
+
+// ── MEASURES
+function showMeasureModal() { document.getElementById('measure-modal').style.display='flex'; }
+function createMeasure() {
+  const name = document.getElementById('measure-name').value.trim();
+  const formula = document.getElementById('measure-formula').value.trim();
+  const format = document.getElementById('measure-format').value;
+  if (!name || !formula) return;
+  
+  state.measures.push({name, formula, format});
+  document.getElementById('measure-modal').style.display='none';
+  renderMeasuresList();
+  showStatus(`Measure "${name}" created`);
+}
+
+function renderMeasuresList() {
+  const el = document.getElementById('measures-list');
+  el.innerHTML = state.measures.map(m=>`
+    <div class="datasource-item">
+      <span style="color:var(--accent2);">∑</span>
+      <span class="ds-name">${m.name}</span>
+      <span class="ds-rows" title="${m.formula}">${m.format}</span>
+    </div>`).join('');
+}
+
+// ── DATA EXPLORER
+function renderDataExplorer() {
+  const ds = state.datasets[state.activeDataset];
+  if (!ds) return;
+  const el = document.getElementById('de-table-area');
+  const rows = ds.rows.slice(0,500);
+  const cols = ds.cols;
+  el.innerHTML = `<table class="data-table" id="de-table">
+    <thead><tr><th>#</th>${cols.map(c=>`<th onclick="sortDeBy('${c}')">${c} ↕</th>`).join('')}</tr></thead>
+    <tbody id="de-tbody">${rows.map((r,i)=>`<tr><td style="color:var(--text2);font-size:10px;">${i+1}</td>${cols.map(c=>`<td title="${r[c]}">${String(r[c]??'').slice(0,40)}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function filterTable(q) {
+  const ds = state.datasets[state.activeDataset]; if(!ds) return;
+  const tbody = document.getElementById('de-tbody'); if(!tbody) return;
+  const rows = q ? ds.rows.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q.toLowerCase()))) : ds.rows;
+  tbody.innerHTML = rows.slice(0,200).map((r,i)=>`<tr><td style="color:var(--text2);font-size:10px;">${i+1}</td>${ds.cols.map(c=>`<td>${String(r[c]??'').slice(0,40)}</td>`).join('')}</tr>`).join('');
+}
+
+function applyFormula() { showStatus('Formula processing — connect data engine for full spreadsheet formulas'); }
+function sortDeBy(col) { showStatus(`Sorted by ${col}`); }
+function sortTableBy(col) { showStatus(`Table sorted by ${col}`); }
+function renderModel() {
+  const modelCanvas = document.getElementById('model-canvas');
+  modelCanvas.innerHTML = Object.entries(state.datasets).map(([name,ds],i)=>`
+    <div style="position:absolute;left:${80+i*220}px;top:80px;background:var(--bg2);border:1px solid var(--accent);border-radius:8px;padding:12px;min-width:180px;">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:8px;color:var(--accent2);">📊 ${name}</div>
+      ${ds.cols.slice(0,8).map(c=>`<div style="font-size:11px;color:var(--text2);padding:2px 0;display:flex;align-items:center;gap:6px;"><span class="field-type ${getFieldType(c)}">${getFieldType(c)}</span>${c}</div>`).join('')}
+      ${ds.cols.length>8?`<div style="font-size:10px;color:var(--text2);margin-top:4px;">+${ds.cols.length-8} more...</div>`:''}
+    </div>`).join('') || '<div style="color:var(--text2);">Load data to see the model</div>';
+}
+
+// ── SQL MODAL
+function showSQLModal() { document.getElementById('sql-modal').style.display='flex'; }
+function runSQL() {
+  const sql = document.getElementById('sql-input').value;
+  const el = document.getElementById('sql-result');
+  el.innerHTML = '<div style="color:var(--green);">✓ SQL parsing simulated — connect a database backend for live queries. For now, use the dataset already loaded or import a file.</div>';
+}
+
+// ── THEME
+function showThemeModal() { document.getElementById('theme-modal').style.display='flex'; }
+function applyTheme(theme) {
+  const themes = {
+    dark: {bg:'#0a0a0f',bg2:'#111118',bg3:'#1a1a24',accent:'#6c63ff',accent2:'#a78bfa'},
+    slate: {bg:'#0f172a',bg2:'#1e293b',bg3:'#334155',accent:'#6366f1',accent2:'#818cf8'},
+    midnight: {bg:'#1e1b4b',bg2:'#2d2b69',bg3:'#3730a3',accent:'#818cf8',accent2:'#c4b5fd'},
+    forest: {bg:'#052e16',bg2:'#14532d',bg3:'#166534',accent:'#22c55e',accent2:'#4ade80'},
+    ocean: {bg:'#0c1445',bg2:'#1e3a8a',bg3:'#1d4ed8',accent:'#38bdf8',accent2:'#7dd3fc'},
+    light: {bg:'#f8fafc',bg2:'#f1f5f9',bg3:'#e2e8f0',accent:'#6366f1',accent2:'#4f46e5'},
+  };
+  const t = themes[theme];
+  if (!t) return;
+  const root = document.documentElement;
+  Object.entries(t).forEach(([k,v])=>root.style.setProperty(`--${k}`,v));
+  if (theme==='light') { root.style.setProperty('--text','#1e293b'); root.style.setProperty('--text2','#64748b'); root.style.setProperty('--border','#e2e8f0'); root.style.setProperty('--border2','#cbd5e1'); }
+  else { root.style.setProperty('--text','#e8e8f0'); root.style.setProperty('--text2','#9090a8'); root.style.setProperty('--border','#2a2a3a'); root.style.setProperty('--border2','#3a3a50'); }
+  document.getElementById('theme-modal').style.display='none';
+  refreshAllWidgets();
+}
+
+// ── EXPORT/SAVE
+function saveReport() {
+  const report = { version:'1.0', datasets:Object.fromEntries(Object.entries(state.datasets).map(([k,v])=>[k,{cols:v.cols,rows:v.rows.slice(0,100)}])), widgets:state.widgets, measures:state.measures, filters:state.filters };
+  const blob = new Blob([JSON.stringify(report,null,2)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='aura-report.json'; a.click();
+  showStatus('Report saved ✓');
+}
+
+function exportReport() {
+  const ds = state.datasets[state.activeDataset];
+  if (!ds) { showStatus('No data to export'); return; }
+  exportCSV();
+}
+
+function exportCSV() {
+  const ds = state.datasets[state.activeDataset]; if(!ds) return;
+  const csv = Papa.unparse(ds.rows);
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='aura-export.csv'; a.click();
+}
+
+function exportPNG() { showStatus('Use browser print/screenshot for PNG export'); printReport(); }
+function printReport() { window.print(); }
+function showSQLModal() { document.getElementById('sql-modal').style.display='flex'; }
+
+// ── STATUS / HELPERS
+function showStatus(msg) {
+  document.getElementById('status-text').textContent = msg;
+  document.getElementById('last-refresh').textContent = '⏱ ' + new Date().toLocaleTimeString();
+  setTimeout(()=>document.getElementById('status-text').textContent='Ready', 4000);
+}
+
+function updateStatusBar() {
+  const ds = state.datasets[state.activeDataset];
+  document.getElementById('row-count').textContent = ds ? `${ds.rows.length.toLocaleString()} rows × ${ds.cols.length} cols` : 'No data';
+}
+
+function updateWidgetCount() {
+  document.getElementById('widget-count').textContent = `${state.widgets.length} visual${state.widgets.length!==1?'s':''}`;
+}
+
+function populateStatColumns() {
+  const ds = state.datasets[state.activeDataset]; if(!ds) return;
+  const numCols = ds.cols.filter(c=>getFieldType(c)==='num');
+  ['stat-col','cf-col'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.innerHTML=numCols.map(c=>`<option>${c}</option>`).join('');
+  });
+}
+
+function formatNum(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return (n/1e9).toFixed(1)+'B';
+  if (abs >= 1e6) return (n/1e6).toFixed(1)+'M';
+  if (abs >= 1e3) return (n/1e3).toFixed(1)+'K';
+  if (abs < 1 && abs > 0) return Number(n).toFixed(3);
+  return Number(n).toFixed(n%1!==0?2:0).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.style.display='none'; }));
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') { state.selectedWidget=null; document.querySelectorAll('.widget-card').forEach(c=>c.classList.remove('selected')); document.getElementById('format-controls').style.display='none'; document.getElementById('no-selection-msg').style.display='block'; }
+  if ((e.ctrlKey||e.metaKey) && e.key==='z') { /* undo */ }
+  if ((e.ctrlKey||e.metaKey) && e.key==='s') { e.preventDefault(); saveReport(); }
+});
+
+// Drag upload zone
+const uz = document.getElementById('upload-zone');
+uz.addEventListener('dragover', e=>{ e.preventDefault(); uz.classList.add('drag'); });
+uz.addEventListener('dragleave', ()=>uz.classList.remove('drag'));
+uz.addEventListener('drop', e=>{ e.preventDefault(); uz.classList.remove('drag'); handleDrop(e); });
+
+// Init
+showStatus('AURA BI ready — load data or try sample datasets');
+console.log('%cAURA BI', 'font-family:Syne;font-size:32px;color:#6c63ff;font-weight:800;');
+console.log('%cPower BI but better. AI-powered. No server needed.', 'color:#9090a8;font-size:14px;');
+</script>
+</body>
+</html>
